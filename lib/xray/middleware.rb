@@ -1,8 +1,8 @@
 require "open3"
 
 module Xray
-  OPEN_PATH = '/_xray/open'
-  UPDATE_CONFIG_PATH = '/_xray/config'
+  OPEN_PATH = "/_xray/open"
+  UPDATE_CONFIG_PATH = "/_xray/config"
 
   # This middleware is responsible for injecting xray.js and the Xray bar into
   # the app's pages. It also listens for requests to open files with the user's
@@ -14,9 +14,9 @@ module Xray
 
     def call(env)
       # Request for opening a file path.
-      if env['PATH_INFO'] == OPEN_PATH
+      if env["PATH_INFO"] == OPEN_PATH
         req, res = Rack::Request.new(env), Rack::Response.new
-        out, _err, status = Xray.open_file(req.GET['path'])
+        out, _err, status = Xray.open_file(req.GET["path"])
         if status.success?
           res.status = 200
         else
@@ -24,12 +24,12 @@ module Xray
           res.status = 500
         end
         res.finish
-      elsif env['PATH_INFO'] == UPDATE_CONFIG_PATH
+      elsif env["PATH_INFO"] == UPDATE_CONFIG_PATH
         req, res = Rack::Request.new(env), Rack::Response.new
-        if req.post? && Xray.config.editor = req.POST['editor']
-          res.status = 200
+        res.status = if req.post? && Xray.config.editor = req.POST["editor"]
+          200
         else
-          res.status = 400
+          400
         end
         res.finish
 
@@ -37,13 +37,13 @@ module Xray
       else
         status, headers, response = @app.call(env)
 
-        if html_headers?(status, headers) && body = response_body(response)
-          if body =~ script_matcher('xray')
+        if html_headers?(status, headers) && (body = response_body(response))
+          if (body =~ script_matcher("xray")) || ENV["FORCE_XRAY_RAILS"] == "true"
             # Inject the xray bar if xray.js is already on the page
             inject_xray_bar!(body)
           elsif Rails.application.config.assets.debug
             # Otherwise try to inject xray.js if assets are unbundled
-            if append_js!(body, 'jquery', 'xray')
+            if append_js!(body, "jquery", "xray")
               inject_xray_bar!(body)
             end
           end
@@ -58,10 +58,10 @@ module Xray
           # Modifying the original response obj maintains compatibility with other middlewares
           if ActionDispatch::Response === response
             response.body = [body]
-            response.header['Content-Length'] = content_length unless committed?(response)
+            response.header["Content-Length"] = content_length unless committed?(response)
             response.to_a
           else
-            headers['Content-Length'] = content_length
+            headers["Content-Length"] = content_length
             [status, headers, [body]]
           end
         else
@@ -83,11 +83,11 @@ module Xray
     def render_xray_bar
       if ApplicationController.respond_to?(:render)
         # Rails 5
-        ApplicationController.render(:partial => "/xray_bar").html_safe
+        ApplicationController.render(partial: "/xray_bar").html_safe
       else
         # Rails <= 4.2
         ac = ActionController::Base.new
-        ac.render_to_string(:partial => '/xray_bar').html_safe
+        ac.render_to_string(partial: "/xray_bar").html_safe
       end
     end
 
@@ -123,13 +123,13 @@ module Xray
 
     def html_headers?(status, headers)
       status == 200 &&
-      headers['Content-Type'] &&
-      headers['Content-Type'].include?('text/html') &&
-      headers["Content-Transfer-Encoding"] != "binary"
+        headers["Content-Type"] &&
+        headers["Content-Type"].include?("text/html") &&
+        headers["Content-Transfer-Encoding"] != "binary"
     end
 
     def response_body(response)
-      body = ''
+      body = ""
       response.each { |s| body << s.to_s }
       body
     end
